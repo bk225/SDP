@@ -1,0 +1,12 @@
+Change Component Designator: Old Designator=*? New Designator=*1
+Change Component Designator: Old Designator=Accel Motor? New Designator=Accel Motor1
+Change Component Designator: Old Designator=Brake Motor? New Designator=Brake Motor1
+Change Component Designator: Old Designator=Offboard Stm? New Designator=Offboard Stm1
+Change Component Designator: Old Designator=Onboard Stm? New Designator=Onboard Stm1
+Change Component Designator: Old Designator=Pi? New Designator=Pi1
+Change Component Designator: Old Designator=Servo? New Designator=Servo1
+Change Component Designator: Old Designator=Servo? New Designator=Servo2
+Change Component Designator: Old Designator=Servo? New Designator=Servo3
+Change Component Designator: Old Designator=Solenoid/Pump? New Designator=Solenoid/Pump1
+Change Component Designator: Old Designator=Steering Motor? New Designator=Steering Motor1
+Change Component Designator: Old Designator=Vin? New Designator=Vin1
