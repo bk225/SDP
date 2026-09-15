@@ -1,0 +1,102 @@
+D13 spi1_sck
+d12 SPI1_SDI / EBYTE MISO
+d11 SPI1_SDO / EBYTE MOSI
+d10 SPI1_CS1 / EBYTE NSS
+d9 RST / EBYTE NRST
+d8 txen
+d7 rxen
+
+#include <SPI.h>
+
+// Elegoo Uno R3 / Arduino Uno pins
+const uint8_t PIN_CS    = 10;  // EBYTE NSS
+const uint8_t PIN_RST   = 9;   // EBYTE NRST
+const uint8_t PIN_TXEN  = 8;   // EBYTE TXEN
+const uint8_t PIN_RXEN  = 7;   // EBYTE RXEN
+
+// Uno hardware SPI pins:
+// D13 = SCK
+// D12 = MISO
+// D11 = MOSI
+
+const uint8_t REG_VERSION = 0x42;
+
+uint8_t readRegister(uint8_t reg)
+{
+  digitalWrite(PIN_CS, LOW);
+
+  // SX1278 SPI:
+  // bit 7 = 0 for READ
+  SPI.transfer(reg & 0x7F);
+
+  uint8_t value = SPI.transfer(0x00);
+
+  digitalWrite(PIN_CS, HIGH);
+
+  return value;
+}
+
+void resetEbyte()
+{
+  digitalWrite(PIN_RST, LOW);
+  delay(10);
+
+  digitalWrite(PIN_RST, HIGH);
+  delay(20);
+}
+
+void setup()
+{
+  Serial.begin(115200);
+
+  pinMode(PIN_CS, OUTPUT);
+  pinMode(PIN_RST, OUTPUT);
+  pinMode(PIN_TXEN, OUTPUT);
+  pinMode(PIN_RXEN, OUTPUT);
+
+  // Safe starting states
+  digitalWrite(PIN_CS, HIGH);
+
+  // Do not enable TX or RX RF paths yet
+  digitalWrite(PIN_TXEN, LOW);
+  digitalWrite(PIN_RXEN, LOW);
+
+  SPI.begin();
+
+  // EBYTE manual recommends relatively slow SPI.
+  // Start at 1 MHz.
+  SPI.beginTransaction(
+    SPISettings(1000000, MSBFIRST, SPI_MODE0)
+  );
+
+  resetEbyte();
+
+  Serial.println();
+  Serial.println("EBYTE E32-400M33S SPI TEST");
+  Serial.println("--------------------------");
+
+  uint8_t version = readRegister(REG_VERSION);
+
+  Serial.print("Register 0x42 = 0x");
+
+  if (version < 0x10)
+  {
+    Serial.print("0");
+  }
+
+  Serial.println(version, HEX);
+
+  if (version == 0x12)
+  {
+    Serial.println("PASS: SX1278 detected.");
+  }
+  else
+  {
+    Serial.println("FAIL: Unexpected response.");
+  }
+}
+
+void loop()
+{
+  // Nothing yet
+}
