@@ -101,6 +101,23 @@ GenerateClassCluster=0
 DocumentUniqueId=OIKWMGCR
 
 [Document4]
+DocumentPath=libraries\symbol\SDP_PPCB.SchLib
+AnnotationEnabled=1
+AnnotateStartValue=1
+AnnotationIndexControlEnabled=0
+AnnotateSuffix=
+AnnotateScope=All
+AnnotateOrder=-1
+DoLibraryUpdate=1
+DoDatabaseUpdate=1
+ClassGenCCAutoEnabled=1
+ClassGenCCAutoRoomEnabled=0
+ClassGenNCAutoScope=None
+DItemRevisionGUID=
+GenerateClassCluster=0
+DocumentUniqueId=NAAQOZNE
+
+[Document5]
 DocumentPath=Schlib1.SchLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -117,7 +134,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=DCHINZEQ
 
-[Document5]
+[Document6]
 DocumentPath=libraries\PcbLib1.PcbLib
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -134,7 +151,7 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=NLPCMNSA
 
-[Document6]
+[Document7]
 DocumentPath=MCU.SchDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
@@ -1147,12 +1164,6 @@ ComponentDesignItemID0=FUSE_178.6764.0001_LTF
 ComponentSymbolReference0=FUSE_178.6764.0001_LTF
 ComponentUpdate0=1
 ComponentIsDeviceSheet0=0
-ComponentLibIdentifierKind1=Library Name And Type
-ComponentLibraryIdentifier1=SDP_PPCB.SchLib
-ComponentDesignItemID1=TLV70033DDCR
-ComponentSymbolReference1=TLV70033DDCR
-ComponentUpdate1=1
-ComponentIsDeviceSheet1=0
 FullReplace=1
 UpdateDesignatorLock=1
 UpdatePartIDLock=1
@@ -1177,14 +1188,8 @@ ParameterUpdate3=1
 ModelTypeGroup0=PCBLIB
 ModelTypeUpdate0=1
 ModelType0=PCBLIB
-ModelName0=DDC5-M
+ModelName0=fuse_holder
 ModelUpdate0=1
-ModelType1=PCBLIB
-ModelName1=fuse_holder
-ModelUpdate1=1
-ModelType2=PCBLIB
-ModelName2=TLV70033DDCR
-ModelUpdate2=1
 
 [DatabaseUpdateOptions]
 SelectedOnly=0
