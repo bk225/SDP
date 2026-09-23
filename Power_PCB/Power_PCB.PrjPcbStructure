@@ -1,2 +1,3 @@
 Record=TopLevelDocument|FileName=Connectors.SchDoc|SheetNumber=2
-Record=NoMainPathDocument|SourceDocument=Connectors.SchDoc|FileName=schem1.SchDoc|SheetNumber=1
+Record=NoMainPathDocument|SourceDocument=Connectors.SchDoc|FileName=MCU.SchDoc|SheetNumber=3
+Record=NoMainPathDocument|SourceDocument=Connectors.SchDoc|FileName=PowerRegulation.SchDoc|SheetNumber=1
