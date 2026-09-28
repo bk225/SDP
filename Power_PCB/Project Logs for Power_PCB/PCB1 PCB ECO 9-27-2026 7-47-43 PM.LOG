@@ -1,0 +1,25 @@
+Change Physical Footprint: Designator=C1 Old Footprint=4.7u New Footprint=4.7u
+Change Physical Footprint: Designator=C2 Old Footprint=4.7u New Footprint=4.7u
+Change Physical Footprint: Designator=C3 Old Footprint=.1U New Footprint=.1U
+Change Physical Footprint: Designator=C6 Old Footprint=.1U New Footprint=.1U
+Change Physical Footprint: Designator=C7 Old Footprint=Cap33u New Footprint=Cap33u
+Change Physical Footprint: Designator=C8 Old Footprint=Cap33u New Footprint=Cap33u
+Change Physical Footprint: Designator=C9 Old Footprint=Cap33u New Footprint=Cap33u
+Change Physical Footprint: Designator=C10 Old Footprint=22u New Footprint=22u
+Change Physical Footprint: Designator=C11 Old Footprint=22u New Footprint=22u
+Change Physical Footprint: Designator=C12 Old Footprint=4.7u New Footprint=4.7u
+Change Physical Footprint: Designator=F1 Old Footprint=fuse_holder New Footprint=fuse_holder
+Change Physical Footprint: Designator=J1 Old Footprint=6pinHeader1 New Footprint=6pinHeader1
+Change Physical Footprint: Designator=J2 Old Footprint=8pinHeader New Footprint=8pinHeader
+Change Physical Footprint: Designator=J3 Old Footprint=6pinHeader2 New Footprint=6pinHeader2
+Change Physical Footprint: Designator=J4 Old Footprint=6pinHeader1 New Footprint=6pinHeader1
+Change Physical Footprint: Designator=J5 Old Footprint=6pinHeader1 New Footprint=6pinHeader1
+Change Physical Footprint: Designator=J6 Old Footprint=8pinHeader New Footprint=8pinHeader
+Change Physical Footprint: Designator=J7 Old Footprint=6pinHeader1 New Footprint=6pinHeader1
+Change Physical Footprint: Designator=J8 Old Footprint=6pinHeader1 New Footprint=6pinHeader1
+Change Physical Footprint: Designator=J9 Old Footprint=6pinHeader1 New Footprint=6pinHeader1
+Change Physical Footprint: Designator=J10 Old Footprint=6pinHeader1 New Footprint=6pinHeader1
+Change Physical Footprint: Designator=J11 Old Footprint=CONN HEADER VERT 2POS New Footprint=CONN HEADER VERT 2POS
+Change Physical Footprint: Designator=U1 Old Footprint=LMR51450FSQDRRRQ1 New Footprint=LMR51450FSQDRRRQ1
+Change Physical Footprint: Designator=U2 Old Footprint=TLV70033DDCR New Footprint=TLV70033DDCR
+Change Physical Footprint: Designator=U3 Old Footprint=NSR020A0X43Z New Footprint=NSR020A0X43Z
