@@ -1,0 +1,22 @@
+** Profile: "STEADY_STATE-steady_state"  [ C:\Users\Bryton King\Documents\GitHub\SDP\SDP\Power_PCB\Simulations\snvmcb2\LMR51450_PSPICE_TRANS\LMR51450_TRANS-PSpiceFiles\STEADY_STATE\steady_state.sim ] 
+
+** Creating circuit file "steady_state.cir" 
+** WARNING: THIS AUTOMATICALLY GENERATED FILE MAY BE OVERWRITTEN BY SUBSEQUENT SIMULATIONS
+
+*Libraries: 
+* Profile Libraries :
+* Local Libraries :
+.LIB "../../../lmr51450_trans.lib" 
+* From [PSPICE NETLIST] section of C:\cds_spb_home\cdssetup\OrCAD_PSpiceTIPSpice_Install\23.1.0\PSpice.ini file:
+.lib "nom_pspti.lib" 
+.lib "nom.lib" 
+
+*Analysis directives: 
+.TRAN  0 600u 0 20n 
+.OPTIONS ADVCONV
+.OPTIONS FILEMODELSEARCH
+.PROBE64 V(alias(*)) I(alias(*)) W(alias(*)) D(alias(*)) NOISE(alias(*)) 
+.INC "..\STEADY_STATE.net" 
+
+
+.END

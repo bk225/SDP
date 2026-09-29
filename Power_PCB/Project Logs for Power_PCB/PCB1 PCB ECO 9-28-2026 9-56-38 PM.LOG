@@ -1,0 +1,27 @@
+Removed Pin From Net: NetName=NRST Pin=U4-7
+Added Component: Designator=B1(Button)
+Added Component: Designator=B2(Button)
+Added Component: Designator=R18(resistor)
+Add component (AddParameter): Name = "DTEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "SimulationGenericComponent"; Value = "True"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "T_REL_LOCAL"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC1"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TC2"; Value = "0"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "TEMP"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10K"; VariantName = "[No Variations]"
+Added Pin To Net: NetName=3v3 Pin=B1-2
+Added Pin To Net: NetName=NRST Pin=B2-1
+Added Pin To Net: NetName=GND Pin=B2-4
+Added Pin To Net: NetName=NRST Pin=R18-1
+Added Pin To Net: NetName=3v3 Pin=R18-2
+Added Pin To Net: NetName=NetB1_3 Pin=B1-3
+Added Pin To Net: NetName=NetB1_3 Pin=R5-2
+Added Pin To Net: NetName=NetB1_3 Pin=U4-45
+Added Net: Name=NetB1_3
+Added Pin To Net: NetName=NetB2_2 Pin=B2-2
+Added Pin To Net: NetName=NetB2_2 Pin=U4-7
+Added Net: Name=NetB2_2
+Added Member To Class: ClassName=MCU Member=Component B1 Button
+Added Member To Class: ClassName=MCU Member=Component B2 Button
+Added Member To Class: ClassName=MCU Member=Component R18 Resistor
