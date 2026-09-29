@@ -1,5 +1,5 @@
 
-**** 09/28/26 23:52:54 **** PSpice 23.1.0 (30 January 2024) *** ID# 0 ********
+**** 09/29/26 00:22:46 **** PSpice 23.1.0 (30 January 2024) *** ID# 0 ********
 
  ** Profile: "STEADY_STATE-steady_state"  [ C:\Users\Bryton King\Documents\GitHub\SDP\SDP\Power_PCB\Simulations\snvmcb2\LMR51450_PSPI
 
@@ -44,7 +44,7 @@ X_C5         VOUT 0 CESR PARAMS:  C=33u  ESR=2m X=1  IC={VOUT*MODE}
 R_Rload         VOUT 0  {VOUT/IOUT} TC=0,0 
 C_C9         EN 0  4.7u   
 L_L1         BOOT VOUT  4.7u IC={IOUT*MODE} 
-R_R13         N14382962 0  21k TC=0,0 
+R_R13         N14382962 0  25k TC=0,0 
 C_C3         N14380769 BOOT  100n   
 R_R3         VOUT FB  100k  
 R_R10         EN N14382898  5k TC=0,0 
@@ -57,7 +57,7 @@ V_V1         N14382696 0 12V
 **** RESUMING steady_state.cir ****
 .END
 
-**** 09/28/26 23:52:54 **** PSpice 23.1.0 (30 January 2024) *** ID# 0 ********
+**** 09/29/26 00:22:46 **** PSpice 23.1.0 (30 January 2024) *** ID# 0 ********
 
  ** Profile: "STEADY_STATE-steady_state"  [ C:\Users\Bryton King\Documents\GitHub\SDP\SDP\Power_PCB\Simulations\snvmcb2\LMR51450_PSPI
 
@@ -78,7 +78,7 @@ V_V1         N14382696 0 12V
 
 (N14382696)   12.0000                 (N14382898)   11.9400                     
 
-(N14382962)     .0361                 
+(N14382962)     .0430                 
 
 
 
@@ -94,7 +94,7 @@ V_V1         N14382696 0 12V
 
           JOB CONCLUDED
 
-**** 09/28/26 23:52:54 **** PSpice 23.1.0 (30 January 2024) *** ID# 0 ********
+**** 09/29/26 00:22:46 **** PSpice 23.1.0 (30 January 2024) *** ID# 0 ********
 
  ** Profile: "STEADY_STATE-steady_state"  [ C:\Users\Bryton King\Documents\GitHub\SDP\SDP\Power_PCB\Simulations\snvmcb2\LMR51450_PSPI
 
@@ -106,5 +106,5 @@ V_V1         N14382696 0 12V
 
 
 
-  Total job time (using Solver 1)   =      683.70
+  Total job time (using Solver 1)   =      703.50
 

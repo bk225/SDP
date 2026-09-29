@@ -1,7 +1,7 @@
 Protel Design System Design Rule Check
 PCB File : C:\Users\Bryton King\Documents\GitHub\SDP\SDP\Power_PCB\PCB1.PcbDoc
-Date     : 9/28/2026
-Time     : 10:47:11 PM
+Date     : 9/29/2026
+Time     : 12:59:04 PM
 
 Processing Rule : Clearance Constraint (Gap=0.2mm) (All),(All)
 Rule Violations :0
@@ -10,7 +10,8 @@ Processing Rule : Short-Circuit Constraint (Allowed=No) (All),(All)
 Rule Violations :0
 
 Processing Rule : Un-Routed Net Constraint ( (All) )
-Rule Violations :0
+   Violation between Un-Routed Net Constraint: Polygon  (GND) on GND Dead Copper - Net Not Assigned.
+Rule Violations :1
 
 Processing Rule : Modified Polygon (Allow modified: No), (Allow shelved: No)
 Rule Violations :0
@@ -43,7 +44,8 @@ Processing Rule : Silk to Silk (Clearance=0.254mm) (All),(All)
 Rule Violations :0
 
 Processing Rule : Net Antennae (Tolerance=0mm) (All)
-Rule Violations :0
+   Violation between Net Antennae: Via (120.35mm,68.1mm) from Top Layer to Signal #2 
+Rule Violations :1
 
 Processing Rule : Board Clearance Constraint (Gap=0mm) (All)
 Rule Violations :0
@@ -51,15 +53,7 @@ Rule Violations :0
 Processing Rule : Height Constraint (Min=0mm) (Max=25.4mm) (Prefered=12.7mm) (All)
 Rule Violations :0
 
-Waived Violations Of Rule : Un-Routed Net Constraint ( (All) )
-   Waived Violation between Un-Routed Net Constraint: Polygon  (GND) on GND Dead Copper - Net Not Assigned.Waived by Bryton King at 9/28/2026 10:46:53 PM
-Waived Violations :1
 
-Waived Violations Of Rule : Net Antennae (Tolerance=0mm) (All)
-   Waived Violation between Net Antennae: Via (126.111mm,66.167mm) from Top Layer to Signal #2 Waived by Bryton King at 9/27/2026 9:08:07 PMIntentional 5V stitching via between power pours
-Waived Violations :1
-
-
-Violations Detected : 0
-Waived Violations : 2
-Time Elapsed        : 00:00:02
+Violations Detected : 2
+Waived Violations : 0
+Time Elapsed        : 00:00:04
