@@ -1,0 +1,46 @@
+//STM Code Structure
+//INITIALIZATION
+    //STM peripherals
+    //UART
+    //PWM timers
+    //GPIO enables
+    //safety/default outputs
+MAIN OPERATION
+    // initialize peripherals
+	// receive UART data
+	// identify complete packet
+	// validate packet
+	// decode packet into command values
+	// validate command ranges
+	// update motor enables
+	// update PWM setpoints
+	// check communication timeout
+
+main
+ │
+ ├── communication
+ │      ├── receive UART
+ │      ├── packet parser
+ │      └── packet validation
+ │
+ ├── command handling
+ │      └── convert received values
+ │
+ ├── motor control
+ │      ├── brake
+ │      ├── steering
+ │      └── drive
+ │
+ ├── servo control
+ │      ├── servo 1
+ │      ├── servo 2
+ │      └── ...
+ │
+ └── safety
+        └── communication timeout
+		
+PACKET
+|START BYTE|START BYTE|BRA_EN|STE_EN|ACC_EN|BRA_PWM|STE_PWM|ACC_PWM3|
+SERVO1|SERVO2|SERVO3|SERVO4|SERVO5|SERVO6|(maybe) CHECKSUM|
+
+
