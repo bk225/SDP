@@ -21,6 +21,7 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
+#include "stdbool.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -29,11 +30,18 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef enum{
+	MOTOR_RUNNING,
+	MOTOR_STOPPING,
+	MOTOR_WAITING
+}MotorState;
 
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+#define MOTOR_REVERSE_DELAY_MS 500U
 
 /* USER CODE END PD */
 
@@ -46,16 +54,228 @@
 
 /* USER CODE BEGIN PV */
 
+uint8_t brake_pwm = 100;
+uint8_t steering_pwm = 100;
+uint8_t accelerator_pwm = 100;
+
+uint8_t brake_enable = 0;
+uint8_t steering_enable = 0;
+uint8_t accelerator_enable = 0;
+
+uint8_t servo_angles[6] = {90, 90, 90, 90, 90, 90};
+
+MotorState acceleratorState = MOTOR_WAITING;
+MotorState brakingState = MOTOR_WAITING;
+MotorState steeringState = MOTOR_WAITING;
+
+int8_t acceleratorDirection = 0;
+int8_t brakingDirection = 0;
+int8_t steeringDirection = 0;
+
+uint32_t acceleratorStopTime = 0;
+uint32_t brakingStopTime = 0;
+uint32_t steeringStopTime = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 
+void disableAccelerating(void);
+void disableBraking(void);
+void disableSteering(void);
+void disableMotors(void);
+void enableAccelerating(void);
+void enableBraking(void);
+void enableSteering(void);
+void setAcceleratorEnable(uint8_t enableCommand);
+void setBrakingEnable(uint8_t enableCommand);
+void setSteeringEnable(uint8_t enableCommand);
+
+
+void startMotorPWM(void);
+void initializeMotorPWM(void);
+uint16_t motorCommandToCCR(uint8_t pwmCommand);
+int8_t motorDirection(unit_8 pwmCommand);
+void setAcceleratorPWM(uint8_t pwmCommand);
+void setBrakingPWM(uint8_t pwmCommand);
+void setSteeringPWM(uint8_t pwmCommand);
+
+bool hasTimeElapsed(uint32_t startTime, uint32_t delayMs);
+bool isDirectionReversed(int8_t previousDirection, int8_t requestedDirection);
+
+
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+bool hasTimeElapsed(uint32_t startTime, uint32_t delayMs){
+	return (delayMs <= (HAL_GetTick() - startTime));
+}
+bool isDirectionReversed(int8_t previousDirection, int8_t requestedDirection){
+	if (previousDirection == 0 || requestedDirection == 0){
+		return false;
+	}
+	if (previousDirection == requestedDirection){
+		return false;
+	}
+	else{
+		return true;
+	}
+}
+
+void disableAccelerating(void){
+	HAL_GPIO_WritePin(GPIOA, ACC_EN1_Pin|ACC_EN2_Pin, GPIO_PIN_RESET);
+}
+void disableBraking(void){
+	HAL_GPIO_WritePin(GPIOB, BRA_EN1_Pin|BRA_EN2_Pin, GPIO_PIN_RESET);
+}
+void disableSteering(void){
+	HAL_GPIO_WritePin(GPIOB, STE_EN1_Pin|STE_EN2_Pin, GPIO_PIN_RESET);
+}
+void disableMotors(void){
+	disableAccelerating();
+	disableSteering();
+	disableBraking();
+}
+void enableAccelerating(void){
+	HAL_GPIO_WritePin(GPIOA, ACC_EN1_Pin|ACC_EN2_Pin, GPIO_PIN_SET);
+}
+void enableBraking(void){
+	HAL_GPIO_WritePin(GPIOB, BRA_EN1_Pin|BRA_EN2_Pin, GPIO_PIN_SET);
+}
+void enableSteering(void){
+	HAL_GPIO_WritePin(GPIOB, STE_EN1_Pin|STE_EN2_Pin, GPIO_PIN_SET);
+}
+void setAcceleratorEnable(uint8_t enableCommand){
+	if (enableCommand == 1){
+		enableAccelerating();
+	}
+	else{
+		disableAccelerating();
+	}
+}
+void setBrakingEnable(uint8_t enableCommand){
+	if (enableCommand == 1){
+		enableBraking();
+	}
+	else{
+		disableBraking();
+	}
+}
+void setSteeringEnable(uint8_t enableCommand){
+	if (enableCommand == 1){
+		enableSteering();
+	}
+	else{
+		disableSteering();
+	}
+}
+
+
+void startMotorPWM(void){
+	if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1) != HAL_OK){
+		disableMotors();
+		Error_Handler();
+	}
+	if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2) != HAL_OK){
+			disableMotors();
+			Error_Handler();
+		}
+	if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3) != HAL_OK){
+			disableMotors();
+			Error_Handler();
+		}
+	if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4) != HAL_OK){
+			disableMotors();
+			Error_Handler();
+		}
+	if (HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1) != HAL_OK){
+			disableMotors();
+			Error_Handler();
+		}
+	if (HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2) != HAL_OK){
+			disableMotors();
+			Error_Handler();
+		}
+}
+void initializeMotorPWM(void){
+	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
+	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
+	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, 0);
+	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 0);
+	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
+	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 0);
+}
+uint16_t motorCommandToCCR(uint8_t pwmCommand){
+    if (pwmCommand > 200) {
+        return 0;
+    }
+
+    if (pwmCommand < 100) {
+        pwmCommand = 100 - pwmCommand;
+    }
+    else {
+        pwmCommand = pwmCommand - 100;
+    }
+
+    return pwmCommand * 50;
+}
+int8_t motorDirection(uint8_t pwmCommand){
+	if (pwmCommand > 200){
+		return 0;
+	}
+	if (pwmCommand > 100){
+		return 1;
+	}
+	else if (pwmCommand < 100){
+		return -1;
+	}
+	else{
+		return 0;
+	}
+}
+void setAcceleratorPWM(uint8_t pwmCommand){
+	uint16_t acceleratorCCR = motorCommandToCCR(pwmCommand);
+	int8_t acceleratorDirection = motorDirection(pwmCommand);
+	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);	//set to 0
+	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
+	if (acceleratorDirection == 1){
+		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, acceleratorCCR);	//PA8 = positive acceleration
+	}
+	else if (acceleratorDirection == -1){
+		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, acceleratorCCR);	//PA9 = negative acceleration
+	}
+}
+void setBrakingPWM(uint8_t pwmCommand){
+	uint16_t brakingCCR = motorCommandToCCR(pwmCommand);
+	int8_t brakingDirection = motorDirection(pwmCommand);
+	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, 0);	//set to 0
+	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 0);
+	if (brakingDirection == 1){
+		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, brakingCCR);	//PA10 = positive braking
+	}
+	else if (brakingDirection == -1){
+		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, brakingCCR);	//PA11 = negative braking
+	}
+}
+void setSteeringPWM(uint8_t pwmCommand){
+	uint16_t steeringCCR = motorCommandToCCR(pwmCommand);
+	int8_t steeringDirection = motorDirection(pwmCommand);
+	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);	//set to 0
+	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 0);
+	if (steeringDirection == 1){
+		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, steeringCCR);	//PA0 = positive steering (right, clockwise)
+	}
+	else if (steeringDirection == -1){
+		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, steeringCCR);	//PA1 = negative steering (left, cc)
+	}
+}
+
+
 
 /* USER CODE END 0 */
 
@@ -94,6 +314,10 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
+
+  disableMotors();
+  initializeMotorPWM();
+  startMotorPWM();
 
   /* USER CODE END 2 */
 
