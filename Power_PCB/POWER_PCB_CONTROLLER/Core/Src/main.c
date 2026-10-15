@@ -36,12 +36,28 @@ typedef enum{
 	MOTOR_WAITING
 }MotorState;
 
+typedef struct{
+	MotorState state;
+	int8_t direction;
+	uint32_t stopTime;
+	void (*setPWM)(uint8_t pwmCommand);
+	void (*setEnable)(uint8_t enableCommand);
+	uint32_t reverseDelayMs;
+}Motor;
+
+void setAcceleratorEnable(uint8_t enableCommand);
+void setBrakingEnable(uint8_t enableCommand);
+void setSteeringEnable(uint8_t enableCommand);
+void setAcceleratorPWM(uint8_t pwmCommand);
+void setBrakingPWM(uint8_t pwmCommand);
+void setSteeringPWM(uint8_t pwmCommand);
+
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define MOTOR_REVERSE_DELAY_MS 500U
 
 /* USER CODE END PD */
 
@@ -64,17 +80,41 @@ uint8_t accelerator_enable = 0;
 
 uint8_t servo_angles[6] = {90, 90, 90, 90, 90, 90};
 
-MotorState acceleratorState = MOTOR_WAITING;
-MotorState brakingState = MOTOR_WAITING;
-MotorState steeringState = MOTOR_WAITING;
+Motor accelerator = {
+    .state = MOTOR_WAITING,
+    .direction = 0,
+    .stopTime = 0,
+	.setPWM = setAcceleratorPWM,
+	.setEnable = setAcceleratorEnable,
+	.reverseDelayMs = 2000
+};
 
-int8_t acceleratorDirection = 0;
-int8_t brakingDirection = 0;
-int8_t steeringDirection = 0;
+Motor braking = {
+    .state = MOTOR_WAITING,
+    .direction = 0,
+    .stopTime = 0,
+	.setPWM = setBrakingPWM,
+	.setEnable = setBrakingEnable,
+	.reverseDelayMs = 1000
+};
 
-uint32_t acceleratorStopTime = 0;
-uint32_t brakingStopTime = 0;
-uint32_t steeringStopTime = 0;
+Motor steering = {
+    .state = MOTOR_WAITING,
+    .direction = 0,
+    .stopTime = 0,
+	.setPWM = setSteeringPWM,
+	.setEnable = setSteeringEnable,
+	.reverseDelayMs = 1000
+};
+
+uint8_t rxByte = 0;
+uint8_t rxPacket[15];
+uint8_t rxIndex = 0;
+uint8_t completedPacket[15];
+volatile bool packetReady = false;
+
+
+
 
 /* USER CODE END PV */
 
@@ -89,28 +129,75 @@ void disableMotors(void);
 void enableAccelerating(void);
 void enableBraking(void);
 void enableSteering(void);
-void setAcceleratorEnable(uint8_t enableCommand);
-void setBrakingEnable(uint8_t enableCommand);
-void setSteeringEnable(uint8_t enableCommand);
+
 
 
 void startMotorPWM(void);
 void initializeMotorPWM(void);
 uint16_t motorCommandToCCR(uint8_t pwmCommand);
-int8_t motorDirection(unit_8 pwmCommand);
-void setAcceleratorPWM(uint8_t pwmCommand);
-void setBrakingPWM(uint8_t pwmCommand);
-void setSteeringPWM(uint8_t pwmCommand);
+int8_t motorDirection(uint8_t pwmCommand);
 
 bool hasTimeElapsed(uint32_t startTime, uint32_t delayMs);
 bool isDirectionReversed(int8_t previousDirection, int8_t requestedDirection);
 
+void updateMotor(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool motorAuthorized);
+void updateAllMotors(bool motorAuthorized);
 
+void processReceivedByte(uint8_t byte);
+bool validateChecksum(uint8_t *packet);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+
+bool validateChecksum(uint8_t *packet){
+	uint16_t sum = 0;
+	uint8_t checkSum = 0;
+	for (uint8_t i = 2; i < 14; i++){
+		uint8_t value = packet[i];
+		sum += value;
+	}
+	checkSum = sum%256;
+	return (checkSum == packet[14]);
+}
+
+void processReceivedByte(uint8_t rxByte){
+	if (rxIndex == 0){
+		if(rxByte == 0xAA){
+			rxPacket[0] = rxByte;
+			rxIndex ++;
+		}
+		return;
+	}
+	if (rxIndex == 1){
+		if(rxByte == 0x55){
+			rxPacket[1] = rxByte;
+			rxIndex ++;
+		}
+		else if(rxByte == 0xAA){
+			rxPacket[0] = rxByte;
+			rxIndex = 1;
+		}
+		else {rxIndex = 0;}
+		return;
+	}
+	if ((rxIndex > 1) && (rxIndex < 15)){
+		rxPacket[rxIndex] = rxByte;
+		rxIndex++;
+	}
+	if (rxIndex == 15){
+		rxIndex = 0;
+		if (!packetReady){
+			for (uint8_t i = 0; i < 15; i++){
+				completedPacket[i] = rxPacket[i];
+			}
+		packetReady = true;
+		}
+	}
+	return;
+}
 
 bool hasTimeElapsed(uint32_t startTime, uint32_t delayMs){
 	return (delayMs <= (HAL_GetTick() - startTime));
@@ -275,6 +362,69 @@ void setSteeringPWM(uint8_t pwmCommand){
 	}
 }
 
+void updateMotor(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool motorAuthorized)
+{
+    int8_t requestedDirection = motorDirection(pwmCommand);
+    if (!motorAuthorized || enableCommand != 1 || requestedDirection == 0)	//Stop immediately if motor operation is not authorized, disabled, or commanded neutral.
+    {
+        motor->setEnable(0);
+        motor->setPWM(100);
+
+        if (motor->state == MOTOR_RUNNING)
+        {
+        	motor->stopTime = HAL_GetTick();
+        	motor->state = MOTOR_WAITING;
+        }
+
+        return;
+    }
+
+    if (motor->state == MOTOR_RUNNING && isDirectionReversed(motor->direction, requestedDirection))    //Detect a reversal while running.
+    {
+        motor->setEnable(0);
+        motor->setPWM(100);
+
+        motor->stopTime = HAL_GetTick();
+        motor->state = MOTOR_STOPPING;
+    }
+
+    if (motor->state == MOTOR_STOPPING) //Handle the stopping interval.
+    {
+        motor->setEnable(0);
+        motor->setPWM(100);
+
+        if (hasTimeElapsed(motor->stopTime,
+                           motor->reverseDelayMs))
+        {
+            motor->state = MOTOR_WAITING;
+        }
+
+        return;
+    }
+
+    if (motor->state == MOTOR_WAITING) //Check whether a waiting motor may restart.
+    {
+        if (!isDirectionReversed(motor->direction,requestedDirection) ||hasTimeElapsed(motor->stopTime,motor->reverseDelayMs))
+        {
+            motor->direction = requestedDirection;
+            motor->state = MOTOR_RUNNING;
+        }
+        else
+        {
+            motor->setEnable(0);
+            motor->setPWM(100);
+            return;
+        }
+    }
+}
+
+void updateAllMotors(bool motorAuthorized)
+{
+	updateMotor(&accelerator, accelerator_pwm, accelerator_enable, motorAuthorized);
+	updateMotor(&braking, brake_pwm, brake_enable, motorAuthorized);
+	updateMotor(&steering, steering_pwm, steering_enable, motorAuthorized);
+}
+
 
 
 /* USER CODE END 0 */
@@ -310,6 +460,8 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
+
+
   MX_USART3_UART_Init();
   MX_TIM3_Init();
   MX_TIM5_Init();
@@ -318,6 +470,12 @@ int main(void)
   disableMotors();
   initializeMotorPWM();
   startMotorPWM();
+
+
+  if (HAL_UART_Receive_IT(&huart3, &rxByte, 1) != HAL_OK){
+	  disableMotors();
+	  Error_Handler();
+  }
 
   /* USER CODE END 2 */
 
@@ -379,6 +537,17 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart == &huart3){
+    	processReceivedByte(rxByte);
+    	if (HAL_UART_Receive_IT(&huart3, &rxByte, 1) != HAL_OK){
+    		disableMotors();
+    		Error_Handler();
+    	}
+    }
+}
 
 /* USER CODE END 4 */
 
