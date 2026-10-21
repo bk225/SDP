@@ -145,12 +145,33 @@ void updateAllMotors(bool motorAuthorized);
 
 void processReceivedByte(uint8_t byte);
 bool validateChecksum(uint8_t *packet);
+bool validateCommands(uint8_t *packet);
+bool validatePacket(uint8_t *packet);
+void applyPacket(uint8_t *packet);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+bool validateCommands(uint8_t *packet){
+	for (uint8_t i = 2; i < 5; i++ ){
+		if (packet[i] != 0 && packet[i] != 1){
+			return false;
+		}
+	}
+	for (uint8_t i = 5; i < 8; i++ ){
+		if (!(packet[i] > 200)){
+			return false;
+		}
+	}
+	for(uint8_t i = 8; i < 14; i++){
+		if(!(packet[i] > 180)){
+			return false;
+		}
+	}
+	return true;
+}
 
 bool validateChecksum(uint8_t *packet){
 	uint16_t sum = 0;
@@ -161,6 +182,25 @@ bool validateChecksum(uint8_t *packet){
 	}
 	checkSum = sum%256;
 	return (checkSum == packet[14]);
+}
+
+bool validatePacket(uint8_t *packet){
+	return (packet[0] == 0xAA && packet[1] == 0x55 && validateChecksum(packet) && validateCommands(packet));
+}
+
+void applyPacket(uint8_t *packet){
+	if (validatePacket(packet)){
+		brake_enable = packet[2];
+		steering_enable = packet[3];
+		accelerator_enable = packet[4];
+		brake_pwm = packet[5];
+		steering_pwm = packet[6];
+		accelerator_pwm = packet[7];
+		for (uint8_t i = 0; i < 6; i++){
+			servo_angles[i] = packet[i+8];
+		}
+	}
+	//confirm?
 }
 
 void processReceivedByte(uint8_t rxByte){
@@ -191,7 +231,7 @@ void processReceivedByte(uint8_t rxByte){
 		rxIndex = 0;
 		if (!packetReady){
 			for (uint8_t i = 0; i < 15; i++){
-				completedPacket[i] = rxPacket[i];
+				completedPacket[i] = packet[i];
 			}
 		packetReady = true;
 		}
