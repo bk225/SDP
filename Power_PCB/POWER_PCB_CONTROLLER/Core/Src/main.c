@@ -30,6 +30,13 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+
+typedef enum{
+	SAFETY_DISARMED,
+	SAFETY_ARMED,
+	SAFETY_FAULT
+}SafetyState;
+
 typedef enum{
 	MOTOR_RUNNING,
 	MOTOR_STOPPING,
@@ -80,6 +87,9 @@ uint8_t accelerator_enable = 0;
 
 uint8_t servo_angles[6] = {90, 90, 90, 90, 90, 90};
 
+uint8_t safetyState = SAFETY_DISARMED;
+bool motorAuthorized = false;
+
 Motor accelerator = {
     .state = MOTOR_WAITING,
     .direction = 0,
@@ -112,7 +122,9 @@ uint8_t rxPacket[15];
 uint8_t rxIndex = 0;
 uint8_t completedPacket[15];
 volatile bool packetReady = false;
-
+uint32_t lastValidPacketTime = 0;
+uint8_t validCommandProlonged = 250;
+bool hasReceivedValidPacket = false;
 
 
 
@@ -147,7 +159,10 @@ void processReceivedByte(uint8_t byte);
 bool validateChecksum(uint8_t *packet);
 bool validateCommands(uint8_t *packet);
 bool validatePacket(uint8_t *packet);
-void applyPacket(uint8_t *packet);
+bool applyPacket(uint8_t *packet);
+bool isCommunicationProlonged(void);
+
+void updateSafetyState(void);
 
 /* USER CODE END PFP */
 
@@ -161,12 +176,12 @@ bool validateCommands(uint8_t *packet){
 		}
 	}
 	for (uint8_t i = 5; i < 8; i++ ){
-		if (!(packet[i] > 200)){
+		if (packet[i] > 200){
 			return false;
 		}
 	}
 	for(uint8_t i = 8; i < 14; i++){
-		if(!(packet[i] > 180)){
+		if(packet[i] > 180){
 			return false;
 		}
 	}
@@ -188,7 +203,7 @@ bool validatePacket(uint8_t *packet){
 	return (packet[0] == 0xAA && packet[1] == 0x55 && validateChecksum(packet) && validateCommands(packet));
 }
 
-void applyPacket(uint8_t *packet){
+bool applyPacket(uint8_t *packet){
 	if (validatePacket(packet)){
 		brake_enable = packet[2];
 		steering_enable = packet[3];
@@ -199,8 +214,9 @@ void applyPacket(uint8_t *packet){
 		for (uint8_t i = 0; i < 6; i++){
 			servo_angles[i] = packet[i+8];
 		}
+		return true;
 	}
-	//confirm?
+	return false;
 }
 
 void processReceivedByte(uint8_t rxByte){
@@ -231,12 +247,22 @@ void processReceivedByte(uint8_t rxByte){
 		rxIndex = 0;
 		if (!packetReady){
 			for (uint8_t i = 0; i < 15; i++){
-				completedPacket[i] = packet[i];
+				completedPacket[i] = rxPacket[i];
 			}
 		packetReady = true;
 		}
 	}
 	return;
+}
+
+bool isCommunicationProlonged(void){
+	if (!hasReceivedValidPacket){
+		return true;
+	}
+	if ((HAL_GetTick() - lastValidPacketTime) > validCommandProlonged){
+		return true;
+	}
+	return false;
 }
 
 bool hasTimeElapsed(uint32_t startTime, uint32_t delayMs){
@@ -465,7 +491,27 @@ void updateAllMotors(bool motorAuthorized)
 	updateMotor(&steering, steering_pwm, steering_enable, motorAuthorized);
 }
 
-
+void updateSafetyState(void){
+	if (safetyState == SAFETY_DISARMED){
+		motorAuthorized = false;
+		disableMotors();
+	}
+	else if (safetyState == SAFETY_ARMED){
+		if (!isCommunicationProlonged()){
+			motorAuthorized = true;
+			safetyState = SAFETY_ARMED;
+		}
+		if (isCommunicationProlonged()){
+			motorAuthorized = false;
+			disableMotors();
+			safetyState = SAFETY_FAULT;
+		}
+	}
+	else if (safetyState == SAFETY_FAULT){
+		motorAuthorized = false;
+		disableMotors();
+	}
+}
 
 /* USER CODE END 0 */
 
@@ -526,6 +572,16 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  updateSafetyState();
+	  if (packetReady){
+		  if (applyPacket(completedPacket)){
+			  lastValidPacketTime = HAL_GetTick();
+			  hasReceivedValidPacket = true;
+		  }
+		  packetReady = false;
+	  }
+
+
   }
   /* USER CODE END 3 */
 }
