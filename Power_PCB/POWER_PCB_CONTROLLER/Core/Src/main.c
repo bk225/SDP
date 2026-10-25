@@ -87,7 +87,7 @@ uint8_t accelerator_enable = 0;
 
 uint8_t servo_angles[6] = {90, 90, 90, 90, 90, 90};
 
-uint8_t safetyState = SAFETY_DISARMED;
+SafetyState safetyState = SAFETY_DISARMED;
 bool motorAuthorized = false;
 
 Motor accelerator = {
@@ -449,18 +449,21 @@ void updateMotor(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool m
     {
         motor->setEnable(0);
         motor->setPWM(100);
-
         motor->stopTime = HAL_GetTick();
         motor->state = MOTOR_STOPPING;
+        return;
+    }
+
+    if (motor->state == MOTOR_RUNNING){
+        motor->setPWM(pwmCommand);
+        return;
     }
 
     if (motor->state == MOTOR_STOPPING) //Handle the stopping interval.
     {
         motor->setEnable(0);
         motor->setPWM(100);
-
-        if (hasTimeElapsed(motor->stopTime,
-                           motor->reverseDelayMs))
+        if (hasTimeElapsed(motor->stopTime, motor->reverseDelayMs) || !isDirectionReversed(motor->direction, requestedDirection))
         {
             motor->state = MOTOR_WAITING;
         }
@@ -473,6 +476,8 @@ void updateMotor(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool m
         if (!isDirectionReversed(motor->direction,requestedDirection) ||hasTimeElapsed(motor->stopTime,motor->reverseDelayMs))
         {
             motor->direction = requestedDirection;
+            motor->setPWM(pwmCommand);
+            motor->setEnable(1);
             motor->state = MOTOR_RUNNING;
         }
         else
@@ -495,21 +500,23 @@ void updateSafetyState(void){
 	if (safetyState == SAFETY_DISARMED){
 		motorAuthorized = false;
 		disableMotors();
+		updateAllMotors(motorAuthorized);
 	}
 	else if (safetyState == SAFETY_ARMED){
 		if (!isCommunicationProlonged()){
 			motorAuthorized = true;
-			safetyState = SAFETY_ARMED;
+			updateAllMotors(motorAuthorized);
 		}
-		if (isCommunicationProlonged()){
+		else{
 			motorAuthorized = false;
 			disableMotors();
-			safetyState = SAFETY_FAULT;
+			updateAllMotors(motorAuthorized);
 		}
 	}
 	else if (safetyState == SAFETY_FAULT){
 		motorAuthorized = false;
 		disableMotors();
+		updateAllMotors(motorAuthorized);
 	}
 }
 
@@ -572,7 +579,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  updateSafetyState();
+
 	  if (packetReady){
 		  if (applyPacket(completedPacket)){
 			  lastValidPacketTime = HAL_GetTick();
@@ -580,7 +587,7 @@ int main(void)
 		  }
 		  packetReady = false;
 	  }
-
+	  updateSafetyState();
 
   }
   /* USER CODE END 3 */
