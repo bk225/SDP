@@ -117,6 +117,15 @@ Motor steering = {
 	.reverseDelayMs = 1000
 };
 
+Motor testMotor = {
+	.state = MOTOR_WAITING,
+	.direction = 0,
+	.stopTime = 0,
+	.setPWM = mockSetPWM(command),
+	.setEnable = mockSetEnable (command),
+	.reverseDelayMs = 2000
+};
+
 uint8_t rxByte = 0;
 uint8_t rxPacket[15];
 uint8_t rxIndex = 0;
@@ -126,6 +135,9 @@ uint32_t lastValidPacketTime = 0;
 uint8_t validCommandProlonged = 250;
 bool hasReceivedValidPacket = false;
 
+//testing
+uint8_t PWMrecord = 0;
+uint8_t ENrecord = 0;
 
 
 /* USER CODE END PV */
@@ -163,6 +175,11 @@ bool applyPacket(uint8_t *packet);
 bool isCommunicationProlonged(void);
 
 void updateSafetyState(void);
+
+//testing
+uint32_t mockSetPWM(uint8_t command);
+uint32_t mockSetEnable(uint8_t command);
+void runMotorTest(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool motorAuthorized);
 
 /* USER CODE END PFP */
 
@@ -520,6 +537,16 @@ void updateSafetyState(void){
 	}
 }
 
+//testing
+uint32_t mockSetPWM(uint8_t command){
+	PWMrecord = command;
+}
+uint32_t mockSetEnable(uint8_t command){
+	ENrecord = command;
+}
+void runMotorTest(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool motorAuthorized){
+	updateMotor(&testMotor);
+}
 /* USER CODE END 0 */
 
 /**
@@ -530,6 +557,8 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+
+
 
   /* USER CODE END 1 */
 
@@ -563,6 +592,7 @@ int main(void)
   disableMotors();
   initializeMotorPWM();
   startMotorPWM();
+
 
 
   if (HAL_UART_Receive_IT(&huart3, &rxByte, 1) != HAL_OK){
