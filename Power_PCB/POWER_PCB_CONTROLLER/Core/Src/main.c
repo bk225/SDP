@@ -132,8 +132,11 @@ uint8_t accelerator_enable = 0;
 
 
 
-uint8_t servo_angles[6] = {90, 90, 90, 90, 90, 90};
+uint8_t servo_commands[5] = {0, 0, 0, 0, 0};
 
+uint8_t servo_angles[5] = {90, 90, 90, 90, 90};
+
+uint32_t lastServoStepTime[5] = {0};
 
 
 SafetyState safetyState = SAFETY_DISARMED;
@@ -198,11 +201,11 @@ Motor steering = {
 
 uint8_t rxByte = 0;
 
-uint8_t rxPacket[15];
+uint8_t rxPacket[14];
 
 uint8_t rxIndex = 0;
 
-uint8_t completedPacket[15];
+uint8_t completedPacket[14];
 
 volatile bool packetReady = false;
 
@@ -285,6 +288,14 @@ bool isCommunicationProlonged(void);
 void updateSafetyState(void);
 
 
+void updateServoAngles(void);
+
+uint16_t servoAngleToPulseUs(uint8_t angle);
+
+void updateServoPWM(void);
+
+void startServoPWM(void);
+
 
 /* USER CODE END PFP */
 
@@ -316,9 +327,9 @@ bool validateCommands(uint8_t *packet){
 
 	}
 
-	for(uint8_t i = 8; i < 14; i++){
+	for(uint8_t i = 8; i < 13; i++){
 
-		if(packet[i] > 180){
+		if((packet[i] != 100) && (packet[i] != 108) && (packet[i] != 117) && (packet[i] != 114) && (packet[i] != 0)){
 
 			return false;
 
@@ -338,7 +349,7 @@ bool validateChecksum(uint8_t *packet){
 
 	uint8_t checkSum = 0;
 
-	for (uint8_t i = 2; i < 14; i++){
+	for (uint8_t i = 2; i < 13; i++){
 
 		uint8_t value = packet[i];
 
@@ -348,7 +359,7 @@ bool validateChecksum(uint8_t *packet){
 
 	checkSum = sum%256;
 
-	return (checkSum == packet[14]);
+	return (checkSum == packet[13]);
 
 }
 
@@ -378,9 +389,9 @@ bool applyPacket(uint8_t *packet){
 
 		accelerator_pwm = packet[7];
 
-		for (uint8_t i = 0; i < 6; i++){
+		for (uint8_t i = 0; i < 5; i++){
 
-			servo_angles[i] = packet[i+8];
+			servo_commands[i] = packet[i+8];
 
 		}
 
@@ -434,7 +445,7 @@ void processReceivedByte(uint8_t rxByte){
 
 	}
 
-	if ((rxIndex > 1) && (rxIndex < 15)){
+	if ((rxIndex > 1) && (rxIndex < 14)){
 
 		rxPacket[rxIndex] = rxByte;
 
@@ -442,13 +453,13 @@ void processReceivedByte(uint8_t rxByte){
 
 	}
 
-	if (rxIndex == 15){
+	if (rxIndex == 14){
 
 		rxIndex = 0;
 
 		if (!packetReady){
 
-			for (uint8_t i = 0; i < 15; i++){
+			for (uint8_t i = 0; i < 14; i++){
 
 				completedPacket[i] = rxPacket[i];
 
@@ -464,6 +475,155 @@ void processReceivedByte(uint8_t rxByte){
 
 }
 
+void updateServoAngles(void){
+
+    uint32_t currentTime = getFirmwareTick();
+
+    if (isCommunicationProlonged()){
+
+        for (uint8_t i = 0; i < 5; i++){
+
+            lastServoStepTime[i] = currentTime;
+
+        }
+
+        return;
+    }
+
+    for (uint8_t i = 0; i < 5; i++){
+
+    	int8_t direction = 0;
+
+    	if (i == 0 || i == 2 || i == 4){
+
+            if (servo_commands[i] == 114){        // Right
+
+                direction = 1;
+
+            }
+
+            else if (servo_commands[i] == 108){   // Left
+
+                direction = -1;
+
+            }
+
+    	}
+
+    	else {
+
+            if (servo_commands[i] == 117){        // up
+
+                direction = 1;
+
+            }
+
+            else if (servo_commands[i] == 100){   // down
+
+                direction = -1;
+
+            }
+
+    	}
+
+        if (direction == 0){
+
+            lastServoStepTime[i] = currentTime;
+
+        }
+
+        if (currentTime - lastServoStepTime[i] >= 100){
+
+
+
+            if (direction == 1 && servo_angles[i] < 180){
+
+                servo_angles[i]++;
+
+            }
+
+            else if (direction == -1 && servo_angles[i] > 0 ){
+
+            	servo_angles[i]--;
+
+            }
+
+            lastServoStepTime[i] = currentTime;
+
+        }
+
+    }
+
+}
+
+
+uint16_t servoAngleToPulseUs(uint8_t angle){
+
+	if (angle > 180){
+
+		angle = 180;
+
+	}
+
+	uint32_t convert1 = angle * 1000;
+
+	uint16_t convert2 = convert1 / 180;
+
+	uint16_t pulse = 1000 + convert2;
+
+	return pulse;
+
+}
+
+
+void updateServoPWM(void){
+
+	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, servoAngleToPulseUs(servo_angles[0]));
+
+	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, servoAngleToPulseUs(servo_angles[1]));
+
+	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, servoAngleToPulseUs(servo_angles[2]));
+
+	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, servoAngleToPulseUs(servo_angles[3]));
+
+	__HAL_TIM_SET_COMPARE(&htim5, TIM_CHANNEL_3, servoAngleToPulseUs(servo_angles[4]));
+
+}
+
+
+void startServoPWM(void){
+
+	if (HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1) != HAL_OK){
+
+			Error_Handler();
+
+		}
+
+	if (HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2) != HAL_OK){
+
+			Error_Handler();
+
+		}
+
+	if (HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3) != HAL_OK){
+
+			Error_Handler();
+
+		}
+
+	if (HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4) != HAL_OK){
+
+			Error_Handler();
+
+		}
+
+	if (HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3) != HAL_OK){
+
+			Error_Handler();
+
+		}
+
+}
 
 
 bool isCommunicationProlonged(void){
@@ -1078,7 +1238,7 @@ int main(void)
 
   /* USER CODE BEGIN 2 */
   disableMotors();
-#if FIRMWARE_SELF_TEST
+#if FIRMWARE_SELF_TEST //To enable or disable testing, change this line in firmware_tests.h
   /* Do not start motor PWM or arm UART receive in test mode. */
   runFirmwareTests();
   while (1) {
@@ -1087,6 +1247,8 @@ int main(void)
 #else
   initializeMotorPWM();
   startMotorPWM();
+  updateServoPWM();
+  startServoPWM();
   if (HAL_UART_Receive_IT(&huart3, &rxByte, 1) != HAL_OK) {
       disableMotors();
       Error_Handler();
@@ -1128,7 +1290,8 @@ int main(void)
 	  }
 
 	  updateSafetyState();
-
+	  updateServoAngles();
+	  updateServoPWM();
 
 
   }
