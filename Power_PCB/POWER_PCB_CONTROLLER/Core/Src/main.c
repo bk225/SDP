@@ -46,22 +46,20 @@
 
 #include "stdbool.h"
 
-
-
 /* Private includes ----------------------------------------------------------*/
 
 /* USER CODE BEGIN Includes */
+
 #include "firmware_types.h"
+
 #include "firmware_tests.h"
+#include "hardware_tests.h"
+
 /* USER CODE END Includes */
-
-
 
 /* Private typedef -----------------------------------------------------------*/
 
 /* USER CODE BEGIN PTD */
-
-
 
 void setAcceleratorEnable(uint8_t enableCommand);
 
@@ -75,14 +73,7 @@ void setBrakingPWM(uint8_t pwmCommand);
 
 void setSteeringPWM(uint8_t pwmCommand);
 
-
-
-
-
-
 /* USER CODE END PTD */
-
-
 
 /* Private define ------------------------------------------------------------*/
 
@@ -90,31 +81,17 @@ void setSteeringPWM(uint8_t pwmCommand);
 
 /* The FIRMWARE_SELF_TEST switch is in Core/Inc/firmware_tests.h. */
 
-
-
-
-
 /* USER CODE END PD */
-
-
 
 /* Private macro -------------------------------------------------------------*/
 
 /* USER CODE BEGIN PM */
 
-
-
 /* USER CODE END PM */
-
-
 
 /* Private variables ---------------------------------------------------------*/
 
-
-
 /* USER CODE BEGIN PV */
-
-
 
 uint8_t brake_pwm = 100;
 
@@ -122,15 +99,11 @@ uint8_t steering_pwm = 100;
 
 uint8_t accelerator_pwm = 100;
 
-
-
 uint8_t brake_enable = 0;
 
 uint8_t steering_enable = 0;
 
 uint8_t accelerator_enable = 0;
-
-
 
 uint8_t servo_commands[5] = {0, 0, 0, 0, 0};
 
@@ -138,12 +111,9 @@ uint8_t servo_angles[5] = {90, 90, 90, 90, 90};
 
 uint32_t lastServoStepTime[5] = {0};
 
-
 SafetyState safetyState = SAFETY_DISARMED;
 
 bool motorAuthorized = false;
-
-
 
 Motor accelerator = {
 
@@ -161,8 +131,6 @@ Motor accelerator = {
 
 };
 
-
-
 Motor braking = {
 
     .state = MOTOR_WAITING,
@@ -178,8 +146,6 @@ Motor braking = {
 	.reverseDelayMs = 1000
 
 };
-
-
 
 Motor steering = {
 
@@ -197,8 +163,6 @@ Motor steering = {
 
 };
 
-
-
 uint8_t rxByte = 0;
 
 uint8_t rxPacket[14];
@@ -215,19 +179,13 @@ uint8_t validCommandProlonged = 250;
 
 bool hasReceivedValidPacket = false;
 
-
-
 /* USER CODE END PV */
-
-
 
 /* Private function prototypes -----------------------------------------------*/
 
 void SystemClock_Config(void);
 
 /* USER CODE BEGIN PFP */
-
-
 
 void disableAccelerating(void);
 
@@ -243,12 +201,6 @@ void enableBraking(void);
 
 void enableSteering(void);
 
-
-
-
-
-
-
 void startMotorPWM(void);
 
 void initializeMotorPWM(void);
@@ -257,19 +209,13 @@ uint16_t motorCommandToCCR(uint8_t pwmCommand);
 
 int8_t motorDirection(uint8_t pwmCommand);
 
-
-
 bool hasTimeElapsed(uint32_t startTime, uint32_t delayMs);
 
 bool isDirectionReversed(int8_t previousDirection, int8_t requestedDirection);
 
-
-
 void updateMotor(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool motorAuthorized);
 
 void updateAllMotors(bool motorAuthorized);
-
-
 
 void processReceivedByte(uint8_t byte);
 
@@ -283,10 +229,7 @@ bool applyPacket(uint8_t *packet);
 
 bool isCommunicationProlonged(void);
 
-
-
 void updateSafetyState(void);
-
 
 void updateServoAngles(void);
 
@@ -296,10 +239,7 @@ void updateServoPWM(void);
 
 void startServoPWM(void);
 
-
 /* USER CODE END PFP */
-
-
 
 /* Private user code ---------------------------------------------------------*/
 
@@ -341,8 +281,6 @@ bool validateCommands(uint8_t *packet){
 
 }
 
-
-
 bool validateChecksum(uint8_t *packet){
 
 	uint16_t sum = 0;
@@ -363,15 +301,11 @@ bool validateChecksum(uint8_t *packet){
 
 }
 
-
-
 bool validatePacket(uint8_t *packet){
 
 	return (packet[0] == 0xAA && packet[1] == 0x55 && validateChecksum(packet) && validateCommands(packet));
 
 }
-
-
 
 bool applyPacket(uint8_t *packet){
 
@@ -402,8 +336,6 @@ bool applyPacket(uint8_t *packet){
 	return false;
 
 }
-
-
 
 void processReceivedByte(uint8_t rxByte){
 
@@ -488,6 +420,7 @@ void updateServoAngles(void){
         }
 
         return;
+
     }
 
     for (uint8_t i = 0; i < 5; i++){
@@ -534,8 +467,6 @@ void updateServoAngles(void){
 
         if (currentTime - lastServoStepTime[i] >= 100){
 
-
-
             if (direction == 1 && servo_angles[i] < 180){
 
                 servo_angles[i]++;
@@ -556,7 +487,6 @@ void updateServoAngles(void){
 
 }
 
-
 uint16_t servoAngleToPulseUs(uint8_t angle){
 
 	if (angle > 180){
@@ -575,8 +505,7 @@ uint16_t servoAngleToPulseUs(uint8_t angle){
 
 }
 
-
-void updateServoPWM(void){
+void updateServoPWM(void){		 
 
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, servoAngleToPulseUs(servo_angles[0]));
 
@@ -589,7 +518,6 @@ void updateServoPWM(void){
 	__HAL_TIM_SET_COMPARE(&htim5, TIM_CHANNEL_3, servoAngleToPulseUs(servo_angles[4]));
 
 }
-
 
 void startServoPWM(void){
 
@@ -625,7 +553,6 @@ void startServoPWM(void){
 
 }
 
-
 bool isCommunicationProlonged(void){
 
 	if (!hasReceivedValidPacket){
@@ -643,8 +570,6 @@ bool isCommunicationProlonged(void){
 	return false;
 
 }
-
-
 
 bool hasTimeElapsed(uint32_t startTime, uint32_t delayMs){
 
@@ -673,8 +598,6 @@ bool isDirectionReversed(int8_t previousDirection, int8_t requestedDirection){
 	}
 
 }
-
-
 
 void disableAccelerating(void){
 
@@ -770,11 +693,7 @@ void setSteeringEnable(uint8_t enableCommand){
 
 }
 
-
-
-
-
-void startMotorPWM(void){
+void startMotorPWM(void){ 
 
 	if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1) != HAL_OK){
 
@@ -850,8 +769,6 @@ uint16_t motorCommandToCCR(uint8_t pwmCommand){
 
     }
 
-
-
     if (pwmCommand < 100) {
 
         pwmCommand = 100 - pwmCommand;
@@ -863,8 +780,6 @@ uint16_t motorCommandToCCR(uint8_t pwmCommand){
         pwmCommand = pwmCommand - 100;
 
     }
-
-
 
     return pwmCommand * 50;
 
@@ -970,8 +885,6 @@ void setSteeringPWM(uint8_t pwmCommand){
 
 }
 
-
-
 void updateMotor(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool motorAuthorized)
 
 {
@@ -986,8 +899,6 @@ void updateMotor(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool m
 
         motor->setPWM(100);
 
-
-
         if (motor->state == MOTOR_RUNNING)
 
         {
@@ -998,13 +909,9 @@ void updateMotor(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool m
 
         }
 
-
-
         return;
 
     }
-
-
 
     if (motor->state == MOTOR_RUNNING && isDirectionReversed(motor->direction, requestedDirection))    //Detect a reversal while running.
 
@@ -1022,8 +929,6 @@ void updateMotor(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool m
 
     }
 
-
-
     if (motor->state == MOTOR_RUNNING){
 
         motor->setPWM(pwmCommand);
@@ -1031,8 +936,6 @@ void updateMotor(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool m
         return;
 
     }
-
-
 
     if (motor->state == MOTOR_STOPPING) //Handle the stopping interval.
 
@@ -1050,13 +953,9 @@ void updateMotor(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool m
 
         }
 
-
-
         return;
 
     }
-
-
 
     if (motor->state == MOTOR_WAITING) //Check whether a waiting motor may restart.
 
@@ -1092,8 +991,6 @@ void updateMotor(Motor *motor, uint8_t pwmCommand, uint8_t enableCommand, bool m
 
 }
 
-
-
 void updateAllMotors(bool motorAuthorized)
 
 {
@@ -1105,8 +1002,6 @@ void updateAllMotors(bool motorAuthorized)
 	updateMotor(&steering, steering_pwm, steering_enable, motorAuthorized);
 
 }
-
-
 
 void updateSafetyState(void){
 
@@ -1154,11 +1049,7 @@ void updateSafetyState(void){
 
 }
 
-
-
 /* USER CODE END 0 */
-
-
 
 /**
 
@@ -1172,51 +1063,27 @@ int main(void)
 
 {
 
-
-
   /* USER CODE BEGIN 1 */
-
-
-
-
-
-
 
   /* USER CODE END 1 */
 
-
-
   /* MCU Configuration--------------------------------------------------------*/
-
-
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
 
   HAL_Init();
 
-
-
   /* USER CODE BEGIN Init */
 
-
-
   /* USER CODE END Init */
-
-
 
   /* Configure the system clock */
 
   SystemClock_Config();
 
-
-
   /* USER CODE BEGIN SysInit */
 
-
-
   /* USER CODE END SysInit */
-
-
 
   /* Initialize all configured peripherals */
 
@@ -1226,10 +1093,6 @@ int main(void)
 
   MX_TIM2_Init();
 
-
-
-
-
   MX_USART3_UART_Init();
 
   MX_TIM3_Init();
@@ -1237,27 +1100,45 @@ int main(void)
   MX_TIM5_Init();
 
   /* USER CODE BEGIN 2 */
+
   disableMotors();
+
 #if FIRMWARE_SELF_TEST //To enable or disable testing, change this line in firmware_tests.h
+
   /* Do not start motor PWM or arm UART receive in test mode. */
+
   runFirmwareTests();
+
   while (1) {
+
       __NOP(); /* Inspect testChecks/testFailures/testFailureLog. */
+
   }
+
+#elif FIRMWARE_HARDWARE_TEST
+  /* Bench-only mode, independent of motor authorization. */
+  startHardwareTests();
 #else
+
   initializeMotorPWM();
+
   startMotorPWM();
+
   updateServoPWM();
+
   startServoPWM();
+
   if (HAL_UART_Receive_IT(&huart3, &rxByte, 1) != HAL_OK) {
+
       disableMotors();
+
       Error_Handler();
+
   }
+
 #endif
 
 /* USER CODE END 2 */
-
-
 
   /* Infinite loop */
 
@@ -1269,13 +1150,12 @@ int main(void)
 
     /* USER CODE END WHILE */
 
-
-
     /* USER CODE BEGIN 3 */
 
-
-
-	  if (packetReady){
+	  #if FIRMWARE_HARDWARE_TEST
+      serviceHardwareTests();
+#elif !FIRMWARE_SELF_TEST
+      if (packetReady){
 
 		  if (applyPacket(completedPacket)){
 
@@ -1290,17 +1170,17 @@ int main(void)
 	  }
 
 	  updateSafetyState();
-	  updateServoAngles();
-	  updateServoPWM();
 
+	  updateServoAngles();
+
+	  updateServoPWM();
+#endif
 
   }
 
   /* USER CODE END 3 */
 
 }
-
-
 
 /**
 
@@ -1318,15 +1198,11 @@ void SystemClock_Config(void)
 
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-
-
   /** Configure the main internal regulator output voltage
 
   */
 
   HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
-
-
 
   /** Initializes the RCC Oscillators according to the specified parameters
 
@@ -1362,8 +1238,6 @@ void SystemClock_Config(void)
 
   }
 
-
-
   /** Initializes the CPU, AHB and APB buses clocks
 
   */
@@ -1380,8 +1254,6 @@ void SystemClock_Config(void)
 
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-
-
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
 
   {
@@ -1392,11 +1264,7 @@ void SystemClock_Config(void)
 
 }
 
-
-
 /* USER CODE BEGIN 4 */
-
-
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
@@ -1418,11 +1286,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 }
 
-
-
 /* USER CODE END 4 */
-
-
 
 /**
 

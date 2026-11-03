@@ -1,0 +1,57 @@
+--- current_main_clean.c	2026-10-29 02:12:56.877530509 +0000
++++ /mnt/data/SDP_STM32_Test_Package/Core/Src/main.c	2026-10-29 02:13:38.352710117 +0000
+@@ -53,6 +53,7 @@
+ #include "firmware_types.h"
+ 
+ #include "firmware_tests.h"
++#include "hardware_tests.h"
+ 
+ /* USER CODE END Includes */
+ 
+@@ -376,7 +377,7 @@
+ 
+ 	}
+ 
+-	if ((rxIndex > 1) && (rxIndex < 15)){
++	if ((rxIndex > 1) && (rxIndex < 14)){
+ 
+ 		rxPacket[rxIndex] = rxByte;
+ 
+@@ -1114,13 +1115,16 @@
+ 
+   }
+ 
++#elif FIRMWARE_HARDWARE_TEST
++  /* Bench-only mode, independent of motor authorization. */
++  startHardwareTests();
+ #else
+ 
+   initializeMotorPWM();
+ 
+   startMotorPWM();
+ 
+-  updateServoPWM();	
++  updateServoPWM();
+ 
+   startServoPWM();
+ 
+@@ -1148,7 +1152,10 @@
+ 
+     /* USER CODE BEGIN 3 */
+ 
+-	  if (packetReady){
++	  #if FIRMWARE_HARDWARE_TEST
++      serviceHardwareTests();
++#elif !FIRMWARE_SELF_TEST
++      if (packetReady){
+ 
+ 		  if (applyPacket(completedPacket)){
+ 
+@@ -1167,6 +1174,7 @@
+ 	  updateServoAngles();
+ 
+ 	  updateServoPWM();
++#endif
+ 
+   }
+ 

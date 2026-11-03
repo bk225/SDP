@@ -6,6 +6,7 @@
 #include "main.h"
 #include "firmware_types.h"
 #include "firmware_tests.h"
+#include "tim.h"
 
 /* Production globals/functions exported by main.c, used only to test them. */
 extern Motor accelerator;
@@ -16,8 +17,10 @@ extern bool motorAuthorized;
 
 extern uint8_t brake_pwm, steering_pwm, accelerator_pwm;
 extern uint8_t brake_enable, steering_enable, accelerator_enable;
-extern uint8_t servo_angles[6];
-extern uint8_t rxIndex, completedPacket[15];
+extern uint8_t servo_angles[5];
+extern uint8_t servo_commands[5];
+extern uint32_t lastServoStepTime[5];
+extern uint8_t rxIndex, completedPacket[14];
 extern volatile bool packetReady;
 extern uint32_t lastValidPacketTime;
 extern bool hasReceivedValidPacket;
@@ -31,6 +34,12 @@ extern void processReceivedByte(uint8_t byte);
 extern bool validatePacket(uint8_t *packet);
 extern bool applyPacket(uint8_t *packet);
 extern bool isCommunicationProlonged(void);
+extern void updateServoAngles(void);
+extern uint16_t servoAngleToPulseUs(uint8_t angle);
+extern void updateServoPWM(void);
+extern void setAcceleratorPWM(uint8_t pwmCommand);
+extern void setBrakingPWM(uint8_t pwmCommand);
+extern void setSteeringPWM(uint8_t pwmCommand);
 
 #if FIRMWARE_SELF_TEST
 volatile uint32_t testChecks = 0;
@@ -262,33 +271,40 @@ void runMotorTest(void)
     checkMotor("invalid enable disables", MOTOR_WAITING, 100, 0, 1);
 }
 
-static void computeTestChecksum(uint8_t *packet)
+static void computeTestChecksum(uint8_t packet[14])
 {
     uint16_t sum = 0;
-    for (uint8_t i = 2; i < 14; i++) sum += packet[i];
-    packet[14] = (uint8_t)sum;
+    for (uint8_t i = 2; i < 13; i++) sum += packet[i];
+    packet[13] = (uint8_t)(sum % 256u);
 }
 
 static void runProtocolTest(void)
 {
-    uint8_t packet[15] = {
-        0xAA, 0x55, 1, 0, 1, 100, 0, 200, 0, 30, 60, 90, 120, 180, 0
+    /* AA 55, three enables, three PWMs, five direction bytes, checksum. */
+    uint8_t packet[14] = {
+        0xAA, 0x55, 1, 0, 1, 100, 0, 200,
+        0, 114, 108, 117, 100, 0
     };
     computeTestChecksum(packet);
-
     TEST_EQ("packet", "valid", true, validatePacket(packet));
     TEST_EQ("packet", "applied", true, applyPacket(packet));
     TEST_EQ("packet", "brake enable", 1, brake_enable);
     TEST_EQ("packet", "steer enable", 0, steering_enable);
     TEST_EQ("packet", "acc enable", 1, accelerator_enable);
+    TEST_EQ("packet", "brake PWM", 100, brake_pwm);
+    TEST_EQ("packet", "steer PWM", 0, steering_pwm);
     TEST_EQ("packet", "acc PWM", 200, accelerator_pwm);
-    TEST_EQ("packet", "servo 0", 0, servo_angles[0]);
-    TEST_EQ("packet", "servo 5", 180, servo_angles[5]);
+    TEST_EQ("packet", "servo command 0", 0, servo_commands[0]);
+    TEST_EQ("packet", "servo command 1", 114, servo_commands[1]);
+    TEST_EQ("packet", "servo command 2", 108, servo_commands[2]);
+    TEST_EQ("packet", "servo command 3", 117, servo_commands[3]);
+    TEST_EQ("packet", "servo command 4", 100, servo_commands[4]);
+    TEST_EQ("packet", "angles not overwritten", 90, servo_angles[0]);
 
     packet[0] = 0xAB;
     TEST_EQ("invalid header", "rejected", false, applyPacket(packet));
     packet[0] = 0xAA;
-    packet[14] ^= 0x01;
+    packet[13] ^= 0x01;
     TEST_EQ("invalid checksum", "rejected", false, applyPacket(packet));
     computeTestChecksum(packet);
 
@@ -298,12 +314,12 @@ static void runProtocolTest(void)
     packet[7] = 201; computeTestChecksum(packet);
     TEST_EQ("invalid PWM", "rejected", false, applyPacket(packet));
     packet[7] = 200;
-    packet[13] = 181; computeTestChecksum(packet);
-    TEST_EQ("invalid angle", "rejected", false, applyPacket(packet));
-    TEST_EQ("invalid angle", "old command retained", 200, accelerator_pwm);
-    packet[13] = 180; computeTestChecksum(packet);
+    packet[10] = 42; computeTestChecksum(packet);
+    TEST_EQ("invalid servo command", "rejected", false, applyPacket(packet));
+    TEST_EQ("invalid command", "retains old PWM", 200, accelerator_pwm);
+    TEST_EQ("invalid command", "retains old servo", 108, servo_commands[2]);
+    packet[10] = 108; computeTestChecksum(packet);
 
-    // Byte-level receive, including garbage, repeated start byte, and busy slot.
     rxIndex = 0;
     packetReady = false;
     processReceivedByte(0x00);
@@ -312,32 +328,199 @@ static void runProtocolTest(void)
     processReceivedByte(0xAA);
     processReceivedByte(0x55);
     TEST_EQ("RX", "header recognized", 2, rxIndex);
-    for (uint8_t i = 2; i < 15; i++) processReceivedByte(packet[i]);
+    for (uint8_t i = 2; i < 14; i++) processReceivedByte(packet[i]);
     TEST_EQ("RX", "frame ready", true, packetReady);
     TEST_EQ("RX", "index reset", 0, rxIndex);
-    for (uint8_t i = 0; i < 15; i++)
+    for (uint8_t i = 0; i < 14; i++)
         TEST_EQ("RX", "frame contents", packet[i], completedPacket[i]);
 
     uint8_t firstPWM = completedPacket[7];
     packet[7] = 150; computeTestChecksum(packet);
-    for (uint8_t i = 0; i < 15; i++) processReceivedByte(packet[i]);
+    for (uint8_t i = 0; i < 14; i++) processReceivedByte(packet[i]);
     TEST_EQ("RX", "busy frame dropped", firstPWM, completedPacket[7]);
     packetReady = false;
-    for (uint8_t i = 0; i < 15; i++) processReceivedByte(packet[i]);
+    for (uint8_t i = 0; i < 14; i++) processReceivedByte(packet[i]);
     TEST_EQ("RX", "new frame accepted", 150, completedPacket[7]);
     packetReady = false;
     rxIndex = 0;
 
-    // 250 ms is allowed; 251 ms is timed out in this implementation.
     mockTick = 1000;
     hasReceivedValidPacket = false;
-    TEST_EQ("timeout", "no first packet", true, isCommunicationProlonged());
+    TEST_EQ("timeout", "before first packet", true, isCommunicationProlonged());
     hasReceivedValidPacket = true;
     lastValidPacketTime = 1000;
     mockTick = 1250;
-    TEST_EQ("timeout", "at 250 ms", false, isCommunicationProlonged());
+    TEST_EQ("timeout", "250 ms valid", false, isCommunicationProlonged());
     mockTick = 1251;
-    TEST_EQ("timeout", "at 251 ms", true, isCommunicationProlonged());
+    TEST_EQ("timeout", "251 ms expired", true, isCommunicationProlonged());
+}
+
+static void resetServos(uint32_t tick)
+{
+    mockTick = tick;
+    lastValidPacketTime = tick;
+    hasReceivedValidPacket = true;
+    for (uint8_t i = 0; i < 5; i++) {
+        servo_commands[i] = 0;
+        servo_angles[i] = 90;
+        lastServoStepTime[i] = tick;
+    }
+}
+
+static void runServoTest(void)
+{
+    /* Pure angle conversion tests: no external hardware. */
+    TEST_EQ("servo pulse", "0 degrees", 1000, servoAngleToPulseUs(0));
+    TEST_EQ("servo pulse", "30 degrees", 1166, servoAngleToPulseUs(30));
+    TEST_EQ("servo pulse", "90 degrees", 1500, servoAngleToPulseUs(90));
+    TEST_EQ("servo pulse", "180 degrees", 2000, servoAngleToPulseUs(180));
+    TEST_EQ("servo pulse", "clamp 200", 2000, servoAngleToPulseUs(200));
+
+    resetServos(1000);
+    servo_commands[0] = 114; /* pan right */
+    servo_commands[1] = 117; /* tilt up */
+    servo_commands[2] = 108; /* pan left */
+    servo_commands[3] = 100; /* tilt down */
+    servo_commands[4] = 114; /* pan right */
+    mockTick = 1099;
+    updateServoAngles();
+    for (uint8_t i = 0; i < 5; i++)
+        TEST_EQ("servo before 100", "angle unchanged", 90, servo_angles[i]);
+    mockTick = 1100;
+    updateServoAngles();
+    TEST_EQ("servo step 1", "pan 1 right", 91, servo_angles[0]);
+    TEST_EQ("servo step 1", "tilt 2 up", 91, servo_angles[1]);
+    TEST_EQ("servo step 1", "pan 3 left", 89, servo_angles[2]);
+    TEST_EQ("servo step 1", "tilt 4 down", 89, servo_angles[3]);
+    TEST_EQ("servo step 1", "pan 5 right", 91, servo_angles[4]);
+    for (uint8_t i = 0; i < 5; i++)
+        TEST_EQ("servo step 1", "timer updated", 1100, lastServoStepTime[i]);
+
+    mockTick = 1200;
+    updateServoAngles();
+    TEST_EQ("servo step 2", "pan 1", 92, servo_angles[0]);
+    TEST_EQ("servo step 2", "tilt 2", 92, servo_angles[1]);
+    TEST_EQ("servo step 2", "pan 3", 88, servo_angles[2]);
+    TEST_EQ("servo step 2", "tilt 4", 88, servo_angles[3]);
+    TEST_EQ("servo step 2", "pan 5", 92, servo_angles[4]);
+
+    /* A zero command freezes position and resets the step clock. */
+    mockTick = 1250;
+    servo_commands[0] = 0;
+    updateServoAngles();
+    TEST_EQ("servo stop", "angle stays", 92, servo_angles[0]);
+    TEST_EQ("servo stop", "clock reset", 1250, lastServoStepTime[0]);
+    servo_commands[0] = 114;
+    lastValidPacketTime = mockTick; /* Continued fresh Pi packets. */
+    mockTick = 1349;
+    updateServoAngles();
+    TEST_EQ("servo resume", "not early", 92, servo_angles[0]);
+    mockTick = 1350;
+    updateServoAngles();
+    TEST_EQ("servo resume", "exactly 100 ms", 93, servo_angles[0]);
+
+    /* Wrong axis commands are ignored by angle updater. */
+    resetServos(2000);
+    servo_commands[0] = 117; /* up on pan */
+    servo_commands[1] = 114; /* right on tilt */
+    mockTick = 2200;
+    updateServoAngles();
+    TEST_EQ("servo invalid axis", "pan stays", 90, servo_angles[0]);
+    TEST_EQ("servo invalid axis", "tilt stays", 90, servo_angles[1]);
+    TEST_EQ("servo invalid axis", "reset pan clock", 2200, lastServoStepTime[0]);
+
+    /* Two end stops. Servo angle must never wrap outside 0..180. */
+    resetServos(3000);
+    servo_angles[0] = 180;
+    servo_commands[0] = 114;
+    servo_angles[1] = 0;
+    servo_commands[1] = 100;
+    mockTick = 3100;
+    updateServoAngles();
+    TEST_EQ("servo upper stop", "180 held", 180, servo_angles[0]);
+    TEST_EQ("servo lower stop", "0 held", 0, servo_angles[1]);
+    TEST_EQ("servo end stop", "timer updates", 3100, lastServoStepTime[0]);
+    servo_commands[0] = 108;
+    servo_commands[1] = 117;
+    mockTick = 3200;
+    updateServoAngles();
+    TEST_EQ("servo reverse limit", "180 to 179", 179, servo_angles[0]);
+    TEST_EQ("servo reverse limit", "0 to 1", 1, servo_angles[1]);
+
+    /* Communication timeout freezes position but PWM should continue holding. */
+    resetServos(4000);
+    servo_commands[0] = 114;
+    mockTick = 4100;
+    updateServoAngles();
+    TEST_EQ("servo timeout", "before loss", 91, servo_angles[0]);
+    mockTick = 4251;
+    updateServoAngles();
+    TEST_EQ("servo timeout", "angle frozen", 91, servo_angles[0]);
+    TEST_EQ("servo timeout", "timer reset", 4251, lastServoStepTime[0]);
+    lastValidPacketTime = 4251;
+    mockTick = 4349;
+    updateServoAngles();
+    TEST_EQ("servo timeout recovery", "not early", 91, servo_angles[0]);
+    mockTick = 4351;
+    updateServoAngles();
+    TEST_EQ("servo timeout recovery", "100 ms", 92, servo_angles[0]);
+
+    /* Time calculations must survive HAL tick wrapping 0xffffffff -> 0. */
+    resetServos(0xFFFFFFE0u);
+    servo_commands[4] = 114;
+    mockTick = (uint32_t)(0xFFFFFFE0u + 99u);
+    updateServoAngles();
+    TEST_EQ("servo wrap", "99 ms", 90, servo_angles[4]);
+    mockTick = (uint32_t)(0xFFFFFFE0u + 100u);
+    updateServoAngles();
+    TEST_EQ("servo wrap", "100 ms", 91, servo_angles[4]);
+
+    /* CCR register mapping on MCU (or register stub on PC). Output NOT started. */
+    resetServos(5000);
+    servo_angles[0] = 0;
+    servo_angles[1] = 45;
+    servo_angles[2] = 90;
+    servo_angles[3] = 135;
+    servo_angles[4] = 180;
+    updateServoPWM();
+    TEST_EQ("servo CCR", "TIM3 CH1", 1000, __HAL_TIM_GET_COMPARE(&htim3, TIM_CHANNEL_1));
+    TEST_EQ("servo CCR", "TIM3 CH2", 1250, __HAL_TIM_GET_COMPARE(&htim3, TIM_CHANNEL_2));
+    TEST_EQ("servo CCR", "TIM3 CH3", 1500, __HAL_TIM_GET_COMPARE(&htim3, TIM_CHANNEL_3));
+    TEST_EQ("servo CCR", "TIM3 CH4", 1750, __HAL_TIM_GET_COMPARE(&htim3, TIM_CHANNEL_4));
+    TEST_EQ("servo CCR", "TIM5 CH3", 2000, __HAL_TIM_GET_COMPARE(&htim5, TIM_CHANNEL_3));
+    resetServos(6000);
+    updateServoPWM();
+    TEST_EQ("servo CCR", "hold midpoint", 1500, __HAL_TIM_GET_COMPARE(&htim5, TIM_CHANNEL_3));
+}
+
+static void runMotorPWMRegisterTest(void)
+{
+    /* These write only compare registers. Motor PWM channels are not started. */
+    setAcceleratorPWM(150);
+    TEST_EQ("motor CCR", "acc forward CH1", 2500, __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_1));
+    TEST_EQ("motor CCR", "acc reverse CH2 off", 0, __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_2));
+    setAcceleratorPWM(50);
+    TEST_EQ("motor CCR", "acc forward off", 0, __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_1));
+    TEST_EQ("motor CCR", "acc reverse CH2", 2500, __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_2));
+    setAcceleratorPWM(100);
+    TEST_EQ("motor CCR", "acc neutral CH1", 0, __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_1));
+    TEST_EQ("motor CCR", "acc neutral CH2", 0, __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_2));
+
+    setBrakingPWM(150);
+    TEST_EQ("motor CCR", "brake forward CH3", 2500, __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_3));
+    TEST_EQ("motor CCR", "brake reverse off", 0, __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_4));
+    setBrakingPWM(50);
+    TEST_EQ("motor CCR", "brake forward off", 0, __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_3));
+    TEST_EQ("motor CCR", "brake reverse CH4", 2500, __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_4));
+    setBrakingPWM(100);
+
+    setSteeringPWM(150);
+    TEST_EQ("motor CCR", "steer forward CH1", 2500, __HAL_TIM_GET_COMPARE(&htim2, TIM_CHANNEL_1));
+    TEST_EQ("motor CCR", "steer reverse CH2 off", 0, __HAL_TIM_GET_COMPARE(&htim2, TIM_CHANNEL_2));
+    setSteeringPWM(50);
+    TEST_EQ("motor CCR", "steer forward off", 0, __HAL_TIM_GET_COMPARE(&htim2, TIM_CHANNEL_1));
+    TEST_EQ("motor CCR", "steer reverse CH2", 2500, __HAL_TIM_GET_COMPARE(&htim2, TIM_CHANNEL_2));
+    setSteeringPWM(100);
 }
 
 static void resetSafetyTestMotors(void)
@@ -419,7 +602,9 @@ void runFirmwareTests(void)
     testFailures = 0;
     runMotorHelpersTest();
     runMotorTest();
+    runMotorPWMRegisterTest();
     runProtocolTest();
+    runServoTest();
     runSafetyTest();
     testComplete = true;
 }

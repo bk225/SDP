@@ -5,7 +5,18 @@
 #include <stdbool.h>
 
 /* Set to 1 for MOCK-ONLY tests; 0 for the normal application. */
+#ifndef FIRMWARE_SELF_TEST
 #define FIRMWARE_SELF_TEST 1
+#endif
+
+/* Set to 1 only for on-board hardware verification. */
+#ifndef FIRMWARE_HARDWARE_TEST
+#define FIRMWARE_HARDWARE_TEST 0
+#endif
+
+#if FIRMWARE_SELF_TEST && FIRMWARE_HARDWARE_TEST
+#error "Select only one firmware test mode"
+#endif
 
 #define TEST_FAILURE_LOG_CAPACITY 24
 
